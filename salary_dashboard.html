@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时数据驾驶舱 (Real-time Data Cockpit)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            overflow: auto;
+            transition: all 0.3s ease;
+            min-height: 100vh;
+        }
+
+        /* 赛博霓虹皮肤 */
+        .cyber-neon {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #00ff88;
+        }
+
+        .cyber-neon .neon-glow {
+            text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88, 0 0 30px #00ff88;
+        }
+
+        .cyber-neon .card {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        /* 商务极简皮肤 */
+        .business-minimal {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            color: #2c3e50;
+        }
+
+        .business-minimal .card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 初始化配置界面 */
+        .setup-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .setup-form {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            margin: 50px auto;
+            min-height: fit-content;
+            max-height: none;
+        }
+
+        .form-content {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .form-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .form-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .form-content::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .form-content::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .setup-form h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        .scroll-indicator {
+            text-align: center;
+            color: #6c757d;
+            font-size: 12px;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-5px);
+            }
+            60% {
+                transform: translateY(-3px);
+            }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .salary-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .salary-input-group input {
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+        }
+
+        /* 主界面 */
+        .dashboard {
+            display: none;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .main-earning {
+            font-size: 4rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            opacity: 0.8;
+        }
+
+        .card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+
+        .progress-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00cc6a);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* 伪装模式 */
+        .camouflage {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0078d4;
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .camouflage.active {
+            display: flex;
+        }
+
+        .camouflage-content {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .fake-excel {
+            background: #217346;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* 404伪装页面 */
+        .error-404 {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f8f9fa;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .error-404.active {
+            display: block;
+        }
+
+        .error-container {
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-code {
+            font-size: 120px;
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .error-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #495057;
+            border-left: 4px solid #dc3545;
+        }
+
+        .error-hint {
+            font-size: 14px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .browser-bar {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px 5px 0 0;
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+        }
+
+        .browser-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .browser-dot:nth-child(1) { background: #ff5f57; }
+        .browser-dot:nth-child(2) { background: #ffbd2e; }
+        .browser-dot:nth-child(3) { background: #28ca42; }
+
+        /* 数字滚动效果 */
+        .rolling-number {
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            height: 1.2em;
+        }
+
+        .rolling-number span {
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
+
+        /* 下班结算动画 */
+        .celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .gold-particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: gold;
+            border-radius: 50%;
+            animation: fall 3s linear infinite;
+        }
+
+        .gold-coin {
+            position: absolute;
+            font-size: 24px;
+            animation: coinFall 2s ease-out infinite;
+            pointer-events: none;
+        }
+
+        .neon-particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            animation: neonFloat 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .firework {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            animation: explode 1s ease-out forwards;
+        }
+
+        .spark {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #ffd93d;
+            border-radius: 50%;
+            animation: sparkle 0.8s ease-out infinite;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes coinFall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg) scale(0.5);
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(50vh) rotate(180deg) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg) scale(0.8);
+                opacity: 0;
+            }
+        }
+
+        @keyframes neonFloat {
+            0%, 100% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: translateY(-50px) scale(1.5);
+                opacity: 0.7;
+            }
+        }
+
+        @keyframes explode {
+            0% {
+                transform: scale(0);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(20);
+                opacity: 0;
+            }
+        }
+
+        @keyframes sparkle {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--x), var(--y)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .main-earning {
+                font-size: 2.5rem;
+            }
+            
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .setup-container {
+                padding: 5px;
+            }
+            
+            .setup-form {
+                padding: 20px;
+                margin: 10px auto;
+                max-width: calc(100% - 20px);
+                min-height: calc(100vh - 20px);
+            }
+            
+            .setup-form h2 {
+                font-size: 1.5rem;
+                margin-bottom: 15px;
+            }
+            
+            .scroll-indicator {
+                font-size: 11px;
+                margin-bottom: 15px;
+            }
+            
+            .form-content {
+                max-height: calc(100vh - 150px);
+                padding-right: 5px;
+            }
+            
+            .form-group {
+                margin-bottom: 12px;
+            }
+            
+            .form-group label {
+                font-size: 14px;
+                margin-bottom: 5px;
+            }
+            
+            .form-group input, .form-group select {
+                padding: 10px;
+                font-size: 14px;
+            }
+            
+            .btn-primary {
+                padding: 12px 20px;
+                font-size: 14px;
+                margin-top: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .setup-form {
+                padding: 20px;
+                margin: 5px;
+                max-width: calc(100% - 10px);
+            }
+            
+            .main-earning {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 15px;
+            }
+            
+            .card .value {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* 提示消息 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- 初始化配置界面 -->
+    <div class="setup-container" id="setupContainer">
+        <form class="setup-form" id="setupForm">
+            <h2>🎯 实时数据驾驶舱配置</h2>
+            <div class="scroll-indicator">👇 向下滚动完成所有设置</div>
+            
+            <div class="form-content">
+                <div class="form-group">
+                <label>薪资类型</label>
+                <select id="salaryType">
+                    <option value="annual">年薪制</option>
+                    <option value="monthly">月薪制</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>薪资数额（万元）</label>
+                <div class="salary-input-group">
+                    <input type="number" id="salaryAmount" placeholder="例：30" step="0.1" min="0" required>
+                    <span>万元</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>每月工作天数</label>
+                <input type="number" id="workDaysPerMonth" value="22" min="1" max="31" required>
+            </div>
+            
+            <div class="form-group">
+                <label>货币单位</label>
+                <select id="currency">
+                    <option value="CNY">人民币 (¥)</option>
+                    <option value="USD">美元 ($)</option>
+                    <option value="EUR">欧元 (€)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>上班时间</label>
+                <input type="time" id="startTime" value="09:00" required>
+            </div>
+            
+            <div class="form-group">
+                <label>下班时间</label>
+                <input type="time" id="endTime" value="18:00" required>
+            </div>
+            
+            <div class="form-group">
+                <label>午休时长（分钟）</label>
+                <input type="number" id="lunchBreak" value="60" min="0" max="180" step="15" required>
+            </div>
+            
+            <div class="form-group">
+                <label>动画主题</label>
+                <select id="animationTheme">
+                    <option value="none">无动画</option>
+                    <option value="gold-coins">金币掉落</option>
+                    <option value="neon-particles">霓虹粒子</option>
+                    <option value="fireworks">烟花庆典</option>
+                </select>
+            </div>
+            
+                <button type="submit" class="btn-primary">启动驾驶舱</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 主界面 -->
+    <div class="dashboard" id="dashboard">
+        <div class="header">
+            <div class="main-earning neon-glow" id="mainEarning">￥0.00</div>
+            <div style="font-size: 1.2rem; opacity: 0.8;">今日实时收益</div>
+        </div>
+
+        <div class="stats-container">
+            <div class="card">
+                <h3>已摸鱼时长</h3>
+                <div class="value" id="slackingTime">00:00:00</div>
+            </div>
+            
+            <div class="card">
+                <h3>时薪单价</h3>
+                <div class="value" id="hourlyRate">￥0.00/时</div>
+            </div>
+            
+            <div class="card">
+                <h3>本月预估</h3>
+                <div class="value" id="monthlyEstimate">￥0.00</div>
+            </div>
+            
+            <div class="card">
+                <h3>每秒进账</h3>
+                <div class="value" id="perSecond">￥0.00/秒</div>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <h3>今日目标进度</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div id="progressText">0% / 目标: ￥500.00</div>
+        </div>
+    </div>
+
+    <!-- 伪装模式 -->
+    <div class="camouflage" id="camouflage">
+        <div class="camouflage-content">
+            <div class="fake-excel">
+                <h3>Microsoft Excel - 数据分析报告</h3>
+                <p>正在处理数据...</p>
+                <div style="margin-top: 20px;">
+                    <div>数据处理进度: ████████░░ 80%</div>
+                    <div>预计剩余时间: 2分钟</div>
+                </div>
+            </div>
+            <p style="margin-top: 20px; color: #666;">按 Ctrl+Shift+H 返回工作界面</p>
+        </div>
+    </div>
+
+    <!-- 404伪装页面 -->
+    <div class="error-404" id="error404">
+        <div class="browser-bar">
+            <div class="browser-dot"></div>
+            <div class="browser-dot"></div>
+            <div class="browser-dot"></div>
+        </div>
+        <div class="error-container">
+            <div class="error-code">404</div>
+            <div class="error-title">页面未找到</div>
+            <div class="error-message">
+                抱歉，您访问的页面不存在或已被移除。<br>
+                请检查网址是否正确，或返回上一页继续浏览。
+            </div>
+            <div class="error-details">
+                <strong>错误详情：</strong><br>
+                时间: <span id="errorTime"></span><br>
+                URL: <span id="errorUrl"></span><br>
+                浏览器: <span id="errorBrowser"></span><br>
+                状态: HTTP 404 Not Found
+            </div>
+            <div class="error-hint">
+                💡 提示：按 Tab 键返回原页面
+            </div>
+        </div>
+    </div>
+
+    <!-- 庆祝动画 -->
+    <div class="celebration" id="celebration"></div>
+
+    <!-- 提示消息 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        class SalaryDashboard {
+            constructor() {
+                this.config = null;
+                this.startTime = null;
+                this.earnings = 0;
+                this.isRunning = false;
+                this.isCamouflage = false;
+                this.celebrationShown = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.loadConfig();
+                this.bindEvents();
+                this.checkNewDay();
+                this.lastTrigger = 0;
+                
+                if (this.config) {
+                    this.showDashboard();
+                    this.start();
+                }
+            }
+
+            loadConfig() {
+                const saved = localStorage.getItem('salaryConfig');
+                if (saved) {
+                    this.config = JSON.parse(saved);
+                    document.body.className = this.config.theme;
+                }
+            }
+
+            saveConfig(config) {
+                this.config = config;
+                localStorage.setItem('salaryConfig', JSON.stringify(config));
+                document.body.className = config.theme;
+            }
+
+            bindEvents() {
+                // 配置表单提交
+                document.getElementById('setupForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleSetup();
+                });
+
+                // Boss Key
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.shiftKey && e.key === 'H') {
+                        e.preventDefault();
+                        this.toggleCamouflage();
+                    }
+                    
+                    // Esc键触发404伪装
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.show404Error();
+                    }
+                    
+                    // Tab键恢复界面（只有在404页面显示时才有效）
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.hide404Error();
+                    }
+                });
+
+                // 页面可见性变化
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        this.handleTabHidden();
+                    } else {
+                        this.handleTabVisible();
+                    }
+                });
+            }
+
+            handleSetup() {
+                const salaryType = document.getElementById('salaryType').value;
+                const salaryAmount = parseFloat(document.getElementById('salaryAmount').value);
+                const workDaysPerMonth = parseInt(document.getElementById('workDaysPerMonth').value);
+                const currency = document.getElementById('currency').value;
+                const startTime = document.getElementById('startTime').value;
+                const endTime = document.getElementById('endTime').value;
+                const lunchBreak = parseInt(document.getElementById('lunchBreak').value);
+                const animationTheme = document.getElementById('animationTheme').value;
+
+                if (!salaryAmount || salaryAmount <= 0) {
+                    this.showToast('请输入有效的薪资数额');
+                    return;
+                }
+
+                // 计算工作时长（考虑午休）
+                const [startHour, startMin] = startTime.split(':').map(Number);
+                const [endHour, endMin] = endTime.split(':').map(Number);
+                const totalMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+                const workHours = (totalMinutes - lunchBreak) / 60;
+
+                const config = {
+                    salaryType,
+                    salaryAmount: salaryAmount * 10000, // 转换为元
+                    workDaysPerMonth,
+                    currency,
+                    workHours,
+                    startTime,
+                    endTime,
+                    lunchBreak,
+                    animationTheme,
+                    setupDate: new Date().toDateString()
+                };
+
+                this.saveConfig(config);
+                this.showDashboard();
+                this.start();
+                this.showMorningAnimation();
+            }
+
+            showDashboard() {
+                document.getElementById('setupContainer').style.display = 'none';
+                document.getElementById('dashboard').classList.add('active');
+            }
+
+            start() {
+                if (this.isRunning) return;
+                
+                this.isRunning = true;
+                this.startTime = this.getTodayStartTime();
+                this.updateLoop();
+                this.checkCelebration();
+            }
+
+            getTodayStartTime() {
+                const now = new Date();
+                const [hours, minutes] = this.config.startTime.split(':');
+                const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 
+                    parseInt(hours), parseInt(minutes));
+                
+                return startTime;
+            }
+
+            updateLoop() {
+                if (!this.isRunning) return;
+
+                this.updateEarnings();
+                this.updateDisplay();
+                this.checkCelebration();
+
+                setTimeout(() => this.updateLoop(), 100); // 每100ms更新一次
+            }
+
+            updateEarnings() {
+                const now = new Date();
+                const workStart = this.getTodayStartTime();
+                const workEnd = new Date(workStart.getTime() + this.config.workHours * 60 * 60 * 1000);
+
+                if (now < workStart) {
+                    this.earnings = 0;
+                    return;
+                }
+
+                if (now > workEnd) {
+                    const dailySalary = this.getDailySalary();
+                    this.earnings = dailySalary;
+                    return;
+                }
+
+                const workDuration = now - workStart;
+                const dailySalary = this.getDailySalary();
+                this.earnings = (workDuration / (this.config.workHours * 60 * 60 * 1000)) * dailySalary;
+            }
+
+            getDailySalary() {
+                let monthlySalary;
+                if (this.config.salaryType === 'annual') {
+                    monthlySalary = this.config.salaryAmount / 12;
+                } else {
+                    monthlySalary = this.config.salaryAmount;
+                }
+                return monthlySalary / this.config.workDaysPerMonth;
+            }
+
+            getCurrencySymbol() {
+                const symbols = {
+                    'CNY': '¥',
+                    'USD': '$',
+                    'EUR': '€'
+                };
+                return symbols[this.config.currency] || '¥';
+            }
+
+            updateDisplay() {
+                const mainEarning = document.getElementById('mainEarning');
+                const slackingTime = document.getElementById('slackingTime');
+                const hourlyRate = document.getElementById('hourlyRate');
+                const monthlyEstimate = document.getElementById('monthlyEstimate');
+                const perSecond = document.getElementById('perSecond');
+                const progressFill = document.getElementById('progressFill');
+                const progressText = document.getElementById('progressText');
+
+                const currencySymbol = this.getCurrencySymbol();
+
+                // 更新主要收益显示
+                mainEarning.textContent = `${currencySymbol}${this.earnings.toFixed(2)}`;
+
+                // 更新摸鱼时长
+                const now = new Date();
+                const workStart = this.getTodayStartTime();
+                const workEnd = this.getWorkEndTime();
+                const slackingDuration = now > workStart ? Math.min(now - workStart, workEnd - workStart) : 0;
+                const hours = Math.floor(slackingDuration / (1000 * 60 * 60));
+                const minutes = Math.floor((slackingDuration % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((slackingDuration % (1000 * 60)) / 1000);
+                slackingTime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                // 更新时薪
+                const dailySalary = this.getDailySalary();
+                hourlyRate.textContent = `${currencySymbol}${(dailySalary / this.config.workHours).toFixed(2)}/时`;
+
+                // 更新每秒进账
+                const perSecondEarning = dailySalary / (this.config.workHours * 60 * 60);
+                perSecond.textContent = `${currencySymbol}${perSecondEarning.toFixed(4)}/秒`;
+
+                // 更新本月预估
+                const today = new Date();
+                const dayOfMonth = today.getDate();
+                const monthlyEstimateValue = (this.earnings * dayOfMonth);
+                monthlyEstimate.textContent = `${currencySymbol}${monthlyEstimateValue.toFixed(2)}`;
+
+                // 更新进度条
+                const target = dailySalary * 0.8; // 目标为日薪的80%
+                const progress = Math.min((this.earnings / target) * 100, 100);
+                progressFill.style.width = `${progress}%`;
+                progressText.textContent = `${progress.toFixed(1)}% / 目标: ${currencySymbol}${target.toFixed(2)}`;
+
+                // 添加呼吸灯效果
+                if (progress > 80) {
+                    mainEarning.style.animation = 'pulse 1s infinite';
+                } else {
+                    mainEarning.style.animation = 'none';
+                }
+
+                // 检查动画触发
+                this.checkAnimationTrigger();
+            }
+
+            getWorkEndTime() {
+                const [hours, minutes] = this.config.endTime.split(':');
+                const now = new Date();
+                return new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hours), parseInt(minutes));
+            }
+
+            checkCelebration() {
+                const now = new Date();
+                const workEnd = this.getWorkEndTime();
+
+                if (now >= workEnd && !this.celebrationShown) {
+                    this.showCelebration();
+                    this.celebrationShown = true;
+                }
+            }
+
+            checkAnimationTrigger() {
+                // 每赚取一定金额触发动画
+                const triggerAmount = 100; // 每100元触发一次
+                const currentTrigger = Math.floor(this.earnings / triggerAmount);
+                
+                if (currentTrigger > this.lastTrigger && this.config.animationTheme !== 'none') {
+                    this.triggerAnimation();
+                    this.lastTrigger = currentTrigger;
+                }
+            }
+
+            triggerAnimation() {
+                const celebration = document.getElementById('celebration');
+                celebration.innerHTML = '';
+
+                switch (this.config.animationTheme) {
+                    case 'gold-coins':
+                        this.createGoldCoins();
+                        break;
+                    case 'neon-particles':
+                        this.createNeonParticles();
+                        break;
+                    case 'fireworks':
+                        this.createFireworks();
+                        break;
+                }
+
+                // 3秒后清除动画
+                setTimeout(() => {
+                    celebration.innerHTML = '';
+                }, 3000);
+            }
+
+            createGoldCoins() {
+                const celebration = document.getElementById('celebration');
+                for (let i = 0; i < 20; i++) {
+                    const coin = document.createElement('div');
+                    coin.className = 'gold-coin';
+                    coin.style.left = Math.random() * 100 + '%';
+                    coin.style.animationDelay = Math.random() * 2 + 's';
+                    coin.textContent = '💰';
+                    celebration.appendChild(coin);
+                }
+            }
+
+            createNeonParticles() {
+                const celebration = document.getElementById('celebration');
+                const colors = ['#00ff88', '#ff0088', '#8800ff', '#ff8800'];
+                for (let i = 0; i < 30; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'neon-particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+                    particle.style.animationDelay = Math.random() * 2 + 's';
+                    celebration.appendChild(particle);
+                }
+            }
+
+            createFireworks() {
+                const celebration = document.getElementById('celebration');
+                for (let i = 0; i < 5; i++) {
+                    setTimeout(() => {
+                        const firework = document.createElement('div');
+                        firework.className = 'firework';
+                        firework.style.left = (20 + Math.random() * 60) + '%';
+                        firework.style.top = (20 + Math.random() * 40) + '%';
+                        celebration.appendChild(firework);
+                        
+                        // 创建爆炸粒子
+                        for (let j = 0; j < 15; j++) {
+                            const spark = document.createElement('div');
+                            spark.className = 'spark';
+                            const angle = (j / 15) * 360;
+                            const distance = 30 + Math.random() * 50;
+                            const x = Math.cos(angle * Math.PI / 180) * distance;
+                            const y = Math.sin(angle * Math.PI / 180) * distance;
+                            spark.style.setProperty('--x', x + 'px');
+                            spark.style.setProperty('--y', y + 'px');
+                            spark.style.animationDelay = Math.random() * 0.5 + 's';
+                            firework.appendChild(spark);
+                        }
+                    }, i * 500);
+                }
+            }
+
+            showCelebration() {
+                const celebration = document.getElementById('celebration');
+                celebration.innerHTML = '';
+
+                // 创建金色粒子
+                for (let i = 0; i < 50; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'gold-particle';
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 3 + 's';
+                    celebration.appendChild(particle);
+                }
+
+                // 显示结算消息
+                setTimeout(() => {
+                    const currencySymbol = this.getCurrencySymbol();
+                    this.showToast(`🎉 今日带薪摸鱼进账：${currencySymbol}${this.earnings.toFixed(2)}，辛苦你了（指薪水）！`);
+                }, 1000);
+
+                // 3秒后清除粒子
+                setTimeout(() => {
+                    celebration.innerHTML = '';
+                }, 3000);
+            }
+
+            showMorningAnimation() {
+                this.showToast('🌅 今日薪资池已注入，开始榨取...');
+                
+                // 数字从0滚动到当前值的动画
+                const mainEarning = document.getElementById('mainEarning');
+                let current = 0;
+                const target = this.earnings;
+                const increment = target / 100;
+                
+                const rollAnimation = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        current = target;
+                        clearInterval(rollAnimation);
+                    }
+                    mainEarning.textContent = `￥${current.toFixed(2)}`;
+                }, 20);
+            }
+
+            toggleCamouflage() {
+                this.isCamouflage = !this.isCamouflage;
+                const camouflage = document.getElementById('camouflage');
+                
+                if (this.isCamouflage) {
+                    camouflage.classList.add('active');
+                    this.showToast('🔒 已进入伪装模式');
+                } else {
+                    camouflage.classList.remove('active');
+                    this.showToast('🔓 已退出伪装模式');
+                }
+            }
+
+            show404Error() {
+                const error404 = document.getElementById('error404');
+                const dashboard = document.getElementById('dashboard');
+                const setupContainer = document.getElementById('setupContainer');
+                
+                // 只有在主界面显示时才触发
+                if (dashboard.classList.contains('active') || setupContainer.style.display !== 'none') {
+                    // 填充404页面的动态信息
+                    this.populate404Info();
+                    
+                    // 隐藏所有其他界面
+                    dashboard.classList.remove('active');
+                    setupContainer.style.display = 'none';
+                    document.getElementById('camouflage').classList.remove('active');
+                    
+                    // 显示404页面
+                    error404.classList.add('active');
+                    
+                    // 暂停收益计算
+                    this.isRunning = false;
+                    
+                    this.showToast('🚨 已进入404伪装模式');
+                }
+            }
+
+            hide404Error() {
+                const error404 = document.getElementById('error404');
+                
+                // 只有在404页面显示时才有效
+                if (error404.classList.contains('active')) {
+                    // 隐藏404页面
+                    error404.classList.remove('active');
+                    
+                    // 恢复之前的界面
+                    if (this.config) {
+                        // 如果有配置，显示主界面
+                        document.getElementById('dashboard').classList.add('active');
+                        this.isRunning = true;
+                        this.start();
+                    } else {
+                        // 如果没有配置，显示设置界面
+                        document.getElementById('setupContainer').style.display = 'flex';
+                    }
+                    
+                    this.showToast('✅ 已退出404伪装模式');
+                }
+            }
+
+            populate404Info() {
+                // 设置当前时间
+                const now = new Date();
+                document.getElementById('errorTime').textContent = now.toLocaleString('zh-CN');
+                
+                // 设置当前URL
+                document.getElementById('errorUrl').textContent = window.location.href;
+                
+                // 设置浏览器信息
+                const userAgent = navigator.userAgent;
+                let browserInfo = '未知浏览器';
+                if (userAgent.includes('Chrome')) browserInfo = 'Google Chrome';
+                else if (userAgent.includes('Firefox')) browserInfo = 'Mozilla Firefox';
+                else if (userAgent.includes('Safari')) browserInfo = 'Apple Safari';
+                else if (userAgent.includes('Edge')) browserInfo = 'Microsoft Edge';
+                
+                document.getElementById('errorBrowser').textContent = browserInfo;
+            }
+
+            handleTabHidden() {
+                // 页面隐藏时记录时间
+                this.tabHiddenTime = new Date();
+            }
+
+            handleTabVisible() {
+                if (this.tabHiddenTime) {
+                    const now = new Date();
+                    const hiddenDuration = now - this.tabHiddenTime;
+                    
+                    // 如果隐藏超过5分钟，显示提示
+                    if (hiddenDuration > 5 * 60 * 1000) {
+                        this.showToast('👀 老板刚才好像路过，但我帮你把页面藏好啦！');
+                    }
+                    
+                    this.tabHiddenTime = null;
+                }
+            }
+
+            checkNewDay() {
+                const lastDate = localStorage.getItem('lastVisitDate');
+                const today = new Date().toDateString();
+                
+                if (lastDate !== today) {
+                    localStorage.setItem('lastVisitDate', today);
+                    this.celebrationShown = false;
+                }
+            }
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.classList.add('show');
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        // 添加CSS动画
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 启动应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new SalaryDashboard();
+        });
+    </script>
+</body>
+</html>
